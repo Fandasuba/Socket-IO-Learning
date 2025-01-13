@@ -5,8 +5,8 @@ const path = require("path");
 
 const app = express();
 const server = http.createServer(app);
-const rooms = new Set(); // Add this line to initialize rooms
-let users = {};
+const rooms = new Set();
+const users = new Map(); // Using Map instead of object for better user tracking
 
 const io = new Server(server, {
   cors: {
@@ -21,24 +21,25 @@ app.get("/", (req, res) => {
 });
 
 io.on("connection", (socket) => {
-  console.log("A user connected:", socket.id);
+  console.log("User connected:", socket.id);
+
+  // Send available rooms to the newly connected client
+  socket.emit("availableRooms", Array.from(rooms));
 
   socket.on("setName", (name) => {
-    users[socket.id] = name;
-    console.log(`${name} set their name.`);
-    socket.emit("nameSet", name); // Add confirmation event
+    console.log(`User ${socket.id} set name to: ${name}`);
+    users.set(socket.id, name);
+    socket.emit("availableRooms", Array.from(rooms));
   });
 
   socket.on("createRoom", (room) => {
-    console.log("Starting to create a Room function.");
+    console.log(`Creating room: ${room}`);
     if (!rooms.has(room)) {
       rooms.add(room);
-      socket.join(room);
-      console.log(`User ${users[socket.id]} created and joined room: ${room}`);
       socket.emit("roomCreated", room);
       io.emit("availableRooms", Array.from(rooms));
     } else {
-      socket.emit("roomError", "Room already exists.");
+      socket.emit("roomError", "Room already exists");
     }
   });
 
@@ -47,35 +48,39 @@ io.on("connection", (socket) => {
   });
 
   socket.on("joinRoom", (room) => {
-    // Leave previous room if any
-    Array.from(socket.rooms).forEach((r) => {
-      if (r !== socket.id) socket.leave(r);
+    const userName = users.get(socket.id) || "Anonymous";
+
+    // Leave all current rooms
+    socket.rooms.forEach((r) => {
+      if (r !== socket.id) {
+        socket.leave(r);
+      }
     });
 
     socket.join(room);
-    console.log(`User ${users[socket.id]} joined room: ${room}`);
-    socket.to(room).emit("message", `${users[socket.id]} joined the room.`);
+    socket.to(room).emit("message", `${userName} has joined the room.`);
+    console.log(`${userName} joined room: ${room}`);
   });
 
   socket.on("leaveRoom", (room) => {
+    const userName = users.get(socket.id) || "Anonymous";
     socket.leave(room);
-    console.log(`User ${users[socket.id]} left room: ${room}`);
-    socket.to(room).emit("message", `${users[socket.id]} left the room.`);
+    socket.to(room).emit("message", `${userName} has left the room.`);
   });
 
   socket.on("chatMessage", (data) => {
-    const { room, message } = data;
-    const senderName = users[socket.id] || "Anonymous";
-    const formattedMessage = `${senderName}: ${message}`;
-    io.to(room).emit("message", formattedMessage);
+    const userName = users.get(socket.id) || "Anonymous";
+    const formattedMessage = `${userName}: ${data.message}`;
+    io.to(data.room).emit("message", formattedMessage);
   });
 
   socket.on("disconnect", () => {
-    console.log("User disconnected:", socket.id);
-    delete users[socket.id];
+    const userName = users.get(socket.id) || "Anonymous";
+    console.log(`User disconnected: ${userName}`);
+    users.delete(socket.id);
   });
 });
 
 server.listen(3000, () => {
-  console.log("Server running at http://localhost:3000/");
+  console.log("Server running on http://localhost:3000");
 });

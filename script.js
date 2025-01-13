@@ -3,6 +3,7 @@ const nameSection = document.getElementById("name-section");
 const chatSection = document.getElementById("chat-section");
 const usernameInput = document.getElementById("username-input");
 const setNameButton = document.getElementById("set-name-button");
+const userDisplay = document.getElementById("user-display");
 const roomSelector = document.getElementById("room-selector");
 const joinRoomButton = document.getElementById("join-room");
 const createRoomButton = document.getElementById("create-room");
@@ -18,33 +19,21 @@ let username = "";
 setNameButton.addEventListener("click", () => {
   const name = usernameInput.value.trim();
   if (name) {
+    username = name;
     socket.emit("setName", name);
+
+    // Show immediately for better user feedback
+    nameSection.style.display = "none";
+    chatSection.style.display = "block";
+    userDisplay.textContent = `Current User: ${name}`;
+
+    console.log("Name set:", name); // Debug log
   } else {
     alert("Please enter a valid name.");
   }
 });
 
-// Confirm name was set
-socket.on("nameSet", (name) => {
-  username = name;
-  nameSection.style.display = "none";
-  chatSection.style.display = "block";
-  addMessage(`Welcome, ${username}!`);
-});
-
-// Handle room management
-socket.emit("getRooms");
-
-socket.on("availableRooms", (rooms) => {
-  roomSelector.innerHTML = '<option value="">Select a room...</option>';
-  rooms.forEach((room) => {
-    const option = document.createElement("option");
-    option.value = room;
-    option.textContent = room;
-    roomSelector.appendChild(option);
-  });
-});
-
+// Handle room creation
 createRoomButton.addEventListener("click", () => {
   const newRoom = createRoomInput.value.trim();
   if (newRoom) {
@@ -55,17 +44,26 @@ createRoomButton.addEventListener("click", () => {
   }
 });
 
+// Handle receiving the list of rooms
+socket.on("availableRooms", (rooms) => {
+  console.log("Received rooms:", rooms); // Debug log
+  roomSelector.innerHTML = '<option value="">Select a room...</option>';
+  rooms.forEach((room) => {
+    const option = document.createElement("option");
+    option.value = room;
+    option.textContent = room;
+    roomSelector.appendChild(option);
+  });
+});
+
+// Handle room creation confirmation
 socket.on("roomCreated", (room) => {
-  currentRoom = room;
-  addMessage(`Room '${room}' created and joined.`);
-  // Auto-select the newly created room
-  roomSelector.value = room;
+  console.log("Room created:", room); // Debug log
+  socket.emit("getRooms"); // Request updated room list
+  alert(`Room '${room}' created successfully!`);
 });
 
-socket.on("roomError", (error) => {
-  alert(`Error: ${error}`);
-});
-
+// Join room button handler
 joinRoomButton.addEventListener("click", () => {
   const selectedRoom = roomSelector.value;
   if (!selectedRoom) {
@@ -78,30 +76,46 @@ joinRoomButton.addEventListener("click", () => {
   }
 
   currentRoom = selectedRoom;
-  socket.emit("joinRoom", currentRoom);
+  socket.emit("joinRoom", selectedRoom);
   messagesDiv.innerHTML = "";
-  addMessage(`You joined room: ${currentRoom}`);
+  addMessage(`You joined room: ${selectedRoom}`);
 });
 
-// Handle messages
+// Message form handler
+messageForm.addEventListener("submit", (e) => {
+  e.preventDefault();
+  const message = messageInput.value.trim();
+
+  if (!currentRoom) {
+    alert("Please join a room first!");
+    return;
+  }
+
+  if (message) {
+    socket.emit("chatMessage", {
+      room: currentRoom,
+      message: message,
+      username: username,
+    });
+    messageInput.value = "";
+  }
+});
+
+// Handle incoming messages
 socket.on("message", (message) => {
   addMessage(message);
 });
 
-messageForm.addEventListener("submit", (e) => {
-  e.preventDefault();
-  const message = messageInput.value.trim();
-  if (message && currentRoom) {
-    socket.emit("chatMessage", { room: currentRoom, message });
-    messageInput.value = "";
-  } else if (!currentRoom) {
-    alert("Please join a room first.");
-  }
-});
-
+// Utility function to add messages to the chat
 function addMessage(message) {
   const messageElement = document.createElement("div");
   messageElement.textContent = message;
   messagesDiv.appendChild(messageElement);
   messagesDiv.scrollTop = messagesDiv.scrollHeight;
 }
+
+// Request initial rooms list when connecting
+socket.on("connect", () => {
+  console.log("Connected to server"); // Debug log
+  socket.emit("getRooms");
+});
