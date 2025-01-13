@@ -1,4 +1,8 @@
 const socket = io("http://localhost:3000");
+const nameSection = document.getElementById("name-section");
+const chatSection = document.getElementById("chat-section");
+const usernameInput = document.getElementById("username-input");
+const setNameButton = document.getElementById("set-name-button");
 const roomSelector = document.getElementById("room-selector");
 const joinRoomButton = document.getElementById("join-room");
 const createRoomButton = document.getElementById("create-room");
@@ -7,12 +11,32 @@ const messagesDiv = document.getElementById("messages");
 const messageForm = document.getElementById("message-form");
 const messageInput = document.getElementById("message-input");
 
-let currentRoom = null; // for template literals for checking the room socket ids.
+let currentRoom = null;
+let username = "";
 
-// Fetch available rooms on load
+// Handle name setting
+setNameButton.addEventListener("click", () => {
+  const name = usernameInput.value.trim();
+  if (name) {
+    socket.emit("setName", name);
+  } else {
+    alert("Please enter a valid name.");
+  }
+});
+
+// Confirm name was set
+socket.on("nameSet", (name) => {
+  username = name;
+  nameSection.style.display = "none";
+  chatSection.style.display = "block";
+  addMessage(`Welcome, ${username}!`);
+});
+
+// Handle room management
 socket.emit("getRooms");
+
 socket.on("availableRooms", (rooms) => {
-  roomSelector.innerHTML = ""; // Clear existing options
+  roomSelector.innerHTML = '<option value="">Select a room...</option>';
   rooms.forEach((room) => {
     const option = document.createElement("option");
     option.value = room;
@@ -21,49 +45,57 @@ socket.on("availableRooms", (rooms) => {
   });
 });
 
-// Handle creating a new room
 createRoomButton.addEventListener("click", () => {
   const newRoom = createRoomInput.value.trim();
   if (newRoom) {
     socket.emit("createRoom", newRoom);
-    createRoomInput.value = ""; // Clear input
+    createRoomInput.value = "";
+  } else {
+    alert("Please enter a room name.");
   }
 });
 
 socket.on("roomCreated", (room) => {
-  addMessage(`Room '${room}' created and joined.`);
   currentRoom = room;
+  addMessage(`Room '${room}' created and joined.`);
+  // Auto-select the newly created room
+  roomSelector.value = room;
 });
 
 socket.on("roomError", (error) => {
-  addMessage(`Error: ${error}`);
+  alert(`Error: ${error}`);
 });
 
-// Join a room html listener and socket emit function.
 joinRoomButton.addEventListener("click", () => {
   const selectedRoom = roomSelector.value;
+  if (!selectedRoom) {
+    alert("Please select a room to join.");
+    return;
+  }
+
   if (currentRoom) {
     socket.emit("leaveRoom", currentRoom);
   }
+
   currentRoom = selectedRoom;
   socket.emit("joinRoom", currentRoom);
   messagesDiv.innerHTML = "";
   addMessage(`You joined room: ${currentRoom}`);
 });
 
+// Handle messages
 socket.on("message", (message) => {
-  // this one is for backend emits to the client.
   addMessage(message);
 });
 
-// submit html and submit emit function.
 messageForm.addEventListener("submit", (e) => {
   e.preventDefault();
   const message = messageInput.value.trim();
-  if (message) {
-    socket.emit("chatMessage", { room: currentRoom, message }); // Send message and room to server ending an object in style of socket demands, followed by a addMessage function to show your message without async. The function is below.
-    addMessage(`You: ${message}`);
+  if (message && currentRoom) {
+    socket.emit("chatMessage", { room: currentRoom, message });
     messageInput.value = "";
+  } else if (!currentRoom) {
+    alert("Please join a room first.");
   }
 });
 
@@ -71,5 +103,5 @@ function addMessage(message) {
   const messageElement = document.createElement("div");
   messageElement.textContent = message;
   messagesDiv.appendChild(messageElement);
-  messagesDiv.scrollTop = messagesDiv.scrollHeight; // Auto-scroll to the latest message
+  messagesDiv.scrollTop = messagesDiv.scrollHeight;
 }
