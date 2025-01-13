@@ -15,25 +15,23 @@ const messageInput = document.getElementById("message-input");
 let currentRoom = null;
 let username = "";
 
-// Handle name setting
+// Create guest name.
 setNameButton.addEventListener("click", () => {
   const name = usernameInput.value.trim();
   if (name) {
     username = name;
     socket.emit("setName", name);
-
-    // Show immediately for better user feedback
     nameSection.style.display = "none";
     chatSection.style.display = "block";
     userDisplay.textContent = `Current User: ${name}`;
 
-    console.log("Name set:", name); // Debug log
+    console.log("Name set:", name);
   } else {
     alert("Please enter a valid name.");
   }
 });
 
-// Handle room creation
+// Create room function,
 createRoomButton.addEventListener("click", () => {
   const newRoom = createRoomInput.value.trim();
   if (newRoom) {
@@ -46,7 +44,7 @@ createRoomButton.addEventListener("click", () => {
 
 // Handle receiving the list of rooms
 socket.on("availableRooms", (rooms) => {
-  console.log("Received rooms:", rooms); // Debug log
+  console.log("Received rooms:", rooms);
   roomSelector.innerHTML = '<option value="">Select a room...</option>';
   rooms.forEach((room) => {
     const option = document.createElement("option");
@@ -58,12 +56,12 @@ socket.on("availableRooms", (rooms) => {
 
 // Handle room creation confirmation
 socket.on("roomCreated", (room) => {
-  console.log("Room created:", room); // Debug log
-  socket.emit("getRooms"); // Request updated room list
+  console.log("Room created:", room);
+  socket.emit("getRooms"); // Request updated room list. See Server JS for reference for dynamic updating.
   alert(`Room '${room}' created successfully!`);
 });
 
-// Join room button handler
+// Join room button handler and socket function.
 joinRoomButton.addEventListener("click", () => {
   const selectedRoom = roomSelector.value;
   if (!selectedRoom) {
@@ -81,7 +79,7 @@ joinRoomButton.addEventListener("click", () => {
   addMessage(`You joined room: ${selectedRoom}`);
 });
 
-// Message form handler
+// Message form processing.
 messageForm.addEventListener("submit", (e) => {
   e.preventDefault();
   const message = messageInput.value.trim();
@@ -101,12 +99,11 @@ messageForm.addEventListener("submit", (e) => {
   }
 });
 
-// Handle incoming messages
+// Handle incoming messages section.
 socket.on("message", (message) => {
   addMessage(message);
 });
 
-// Utility function to add messages to the chat
 function addMessage(message) {
   const messageElement = document.createElement("div");
   messageElement.textContent = message;
@@ -114,8 +111,8 @@ function addMessage(message) {
   messagesDiv.scrollTop = messagesDiv.scrollHeight;
 }
 
-// Request initial rooms list when connecting
+// Request initial rooms list on loading.
 socket.on("connect", () => {
-  console.log("Connected to server"); // Debug log
+  console.log("Connected to server");
   socket.emit("getRooms");
 });

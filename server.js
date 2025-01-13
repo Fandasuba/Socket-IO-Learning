@@ -5,7 +5,7 @@ const path = require("path");
 
 const app = express();
 const server = http.createServer(app);
-const rooms = new Set();
+const rooms = new Set(); // Set creates an object containing all the rooms, which also features messages due to emit object variables. Double check this at some point.
 const users = new Map(); // Using Map instead of object for better user tracking
 
 const io = new Server(server, {
@@ -23,10 +23,10 @@ app.get("/", (req, res) => {
 io.on("connection", (socket) => {
   console.log("User connected:", socket.id);
 
-  // Send available rooms to the newly connected client
-  socket.emit("availableRooms", Array.from(rooms));
+  socket.emit("availableRooms", Array.from(rooms)); // sends an array of available rooms to the client side.
 
   socket.on("setName", (name) => {
+    // listens for an event called setName on the client side.
     console.log(`User ${socket.id} set name to: ${name}`);
     users.set(socket.id, name);
     socket.emit("availableRooms", Array.from(rooms));
@@ -37,7 +37,7 @@ io.on("connection", (socket) => {
     if (!rooms.has(room)) {
       rooms.add(room);
       socket.emit("roomCreated", room);
-      io.emit("availableRooms", Array.from(rooms));
+      io.emit("availableRooms", Array.from(rooms)); // looking for the rooms array from above.
     } else {
       socket.emit("roomError", "Room already exists");
     }
@@ -48,10 +48,11 @@ io.on("connection", (socket) => {
   });
 
   socket.on("joinRoom", (room) => {
-    const userName = users.get(socket.id) || "Anonymous";
+    const userName = users.get(socket.id) || "Anonymous"; // display name case checking.
 
     // Leave all current rooms
     socket.rooms.forEach((r) => {
+      // Defaults to leaving rooms because some strange join room on start thing that was going on.
       if (r !== socket.id) {
         socket.leave(r);
       }
@@ -63,6 +64,7 @@ io.on("connection", (socket) => {
   });
 
   socket.on("leaveRoom", (room) => {
+    // redundant code atm since i never made leave button.
     const userName = users.get(socket.id) || "Anonymous";
     socket.leave(room);
     socket.to(room).emit("message", `${userName} has left the room.`);
